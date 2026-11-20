@@ -15,7 +15,6 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
-import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
@@ -150,8 +149,10 @@ object Notif {
 
 /** Keluarkan pop up semak & simpan. */
 object Popup {
-    fun show(ctx: Context, d: Draft) {
-        val id = 1000 + (System.currentTimeMillis() % 900000).toInt()
+    fun newId(): Int = 1000 + (System.currentTimeMillis() % 900000).toInt()
+
+    /** Notifikasi PayMap (sandaran jika kad terapung ditutup). */
+    fun notify(ctx: Context, d: Draft, id: Int) {
         val i = ConfirmActivity.intent(ctx, d, id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val pi = PendingIntent.getActivity(
             ctx, id, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -164,27 +165,54 @@ object Popup {
             "$kind dikesan dari ${d.source}$where. Tekan untuk semak & simpan.",
             pi
         )
-        // Jika izin "papar atas app lain" diberi, terus buka pop up.
-        if (Settings.canDrawOverlays(ctx)) {
-            runCatching { ctx.startActivity(i) }
-        }
     }
 
-    /** Lengkapkan draf dengan lokasi semasa, kemudian papar. */
+    /** Simpan terus tanpa buka borang (butang Simpan pada kad terapung). */
+    fun save(ctx: Context, d: Draft, id: Int) {
+        val t = Txn(
+            id = System.currentTimeMillis(),
+            amount = d.amount ?: 0.0,
+            isIncome = d.isIncome,
+            merchant = d.merchant,
+            category = Cats.guess(d.merchant, d.isIncome),
+            note = "",
+            time = d.time,
+            lat = d.lat,
+            lng = d.lng,
+            place = d.place,
+            source = d.source,
+            mode = Store.mode.value,
+            receipt = null
+        )
+        Store.upsert(t)
+        BudgetAlert.check(ctx, t)
+        Notif.cancel(ctx, id)
+    }
+
+    /** Papar kad terapung serta-merta, kemudian isi lokasi bila GPS siap. */
     suspend fun fromParsed(ctx: Context, p: Parsed) {
-        val loc = LocationHelper.current(ctx)
-        val place = loc?.let { LocationHelper.placeName(ctx, it.latitude, it.longitude) } ?: ""
-        val d = Draft(
+        val id = newId()
+        var d = Draft(
             amount = p.amount,
             isIncome = p.isIncome,
             merchant = p.merchant,
             source = p.source,
-            lat = loc?.latitude,
-            lng = loc?.longitude,
-            place = place,
+            lat = null,
+            lng = null,
+            place = "",
             time = System.currentTimeMillis()
         )
-        withContext(Dispatchers.Main) { show(ctx, d) }
+        withContext(Dispatchers.Main) {
+            notify(ctx, d, id)
+            Overlay.show(ctx, d, id)
+        }
+        val loc = LocationHelper.current(ctx) ?: return
+        val place = LocationHelper.placeName(ctx, loc.latitude, loc.longitude)
+        d = d.copy(lat = loc.latitude, lng = loc.longitude, place = place)
+        withContext(Dispatchers.Main) {
+            notify(ctx, d, id)
+            Overlay.update(d)
+        }
     }
 }
 
@@ -195,8 +223,11 @@ class PayNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val pkg = sbn.packageName ?: return
-        if (!PayParser.apps.containsKey(pkg)) return
         val n = sbn.notification ?: return
+        if (!PayParser.apps.containsKey(pkg)) {
+            logOther(pkg, n)
+            return
+        }
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
         val ex = n.extras
@@ -206,13 +237,29 @@ class PayNotificationListener : NotificationListenerService() {
         if (title.isBlank() && text.isBlank()) return
 
         Store.init(applicationContext)
-        Store.logRaw("${PayParser.apps[pkg]} | $title | $text")
+        val p = PayParser.parse(pkg, title, text)
+        val result = if (p == null) "✗ bukan bayaran" else "✓ dikesan ${rm(p.amount)} · ${p.merchant}"
+        Store.logRaw("${PayParser.apps[pkg]} | $title | $text\n   → $result")
+        if (p == null) return
 
-        val p = PayParser.parse(pkg, title, text) ?: return
         val key = "${p.source}|${p.amount}|${p.merchant}"
         if (Store.isDuplicate(key)) return
 
         scope.launch { Popup.fromParsed(applicationContext, p) }
+    }
+
+    /** Rekod notifikasi berjumlah RM dari app lain (cth app bank / SMS) untuk bantu tambah sokongan. */
+    private fun logOther(pkg: String, n: Notification) {
+        if (pkg == packageName) return
+        val chat = listOf("whatsapp", "telegram", "messenger", "instagram", "facebook", "line", "wechat", "discord", "tiktok", "shopee", "lazada")
+        if (chat.any { pkg.contains(it) }) return
+        val ex = n.extras
+        val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        val text = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString() ?: ""
+        if (!PayParser.hasAmount("$title $text")) return
+        Store.init(applicationContext)
+        Store.logRaw("(app belum dipantau: $pkg) | $title | $text")
     }
 
     override fun onDestroy() {

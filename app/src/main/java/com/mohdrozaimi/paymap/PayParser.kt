@@ -71,6 +71,8 @@ object PayParser {
         "you", "anda", "your", "akaun", "account", "your account", "akaun anda", "the", "mae", "tng"
     )
 
+    fun hasAmount(s: String): Boolean = amountRe.containsMatchIn(s)
+
     fun parse(pkg: String, title: String, text: String): Parsed? {
         val source = apps[pkg] ?: return null
         return parseText(source, title, text)

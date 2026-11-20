@@ -643,7 +643,7 @@ class MainActivity : ComponentActivity() {
                             requestNotifications()
                             if (Build.VERSION.SDK_INT < 33) openAppSettings()
                         }
-                        PermRow("5. Papar atas app lain", "Pilihan — pop up terus keluar tanpa tekan notifikasi", Settings.canDrawOverlays(ctx)) {
+                        PermRow("5. Papar atas app lain", "Wajib untuk pop up keluar sendiri selepas bayar", Settings.canDrawOverlays(ctx)) {
                             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                         }
                         Spacer(Modifier.height(6.dp))
@@ -668,8 +668,11 @@ class MainActivity : ComponentActivity() {
                                     "MAE", "Payment Successful",
                                     "You've made a DuitNow QR payment of RM12.50 to ZUS COFFEE SURIA KLCC."
                                 )
-                                if (p != null) scope.launch(Dispatchers.IO) { Popup.fromParsed(ctx.applicationContext, p) }
-                                Toast.makeText(ctx, "Pop up uji dihantar…", Toast.LENGTH_SHORT).show()
+                                if (p != null) scope.launch(Dispatchers.IO) {
+                                    kotlinx.coroutines.delay(5000)
+                                    Popup.fromParsed(ctx.applicationContext, p)
+                                }
+                                Toast.makeText(ctx, "Pop up uji keluar dalam 5 saat — tekan Home sekarang", Toast.LENGTH_LONG).show()
                             },
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = C.Coral)
@@ -717,7 +720,7 @@ class MainActivity : ComponentActivity() {
 
             item {
                 Text(
-                    "PayMap 1.1 · semua data disimpan dalam telefon ini sahaja. Peta © OpenStreetMap.",
+                    "PayMap 1.2 · semua data disimpan dalam telefon ini sahaja. Peta © OpenStreetMap.",
                     fontSize = 11.sp, color = C.Sub, modifier = Modifier.fillMaxWidth(),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
