@@ -43,6 +43,7 @@ class PayMapApp : Application() {
         Store.init(this)
         Notif.channels(this)
         MonthlyWorker.schedule(this)
+        KeepAliveService.start(this)
         // Simpan ralat terakhir supaya boleh dilihat di Tetapan (bantu debug).
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
@@ -120,6 +121,7 @@ object Notif {
     const val CH_INFO = "info"
     const val CH_QUIET = "pay_quiet"
     const val CH_ALERT = "pay_alert"
+    const val CH_WATCH = "watch"
 
     fun channels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -143,6 +145,12 @@ object Notif {
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
+            }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_WATCH, "Pemantau latar", NotificationManager.IMPORTANCE_MIN).apply {
+                description = "Notifikasi senyap supaya PayMap kekal hidup untuk kesan bayaran"
+                setShowBadge(false)
             }
         )
         nm.createNotificationChannel(
@@ -294,8 +302,12 @@ class PayNotificationListener : NotificationListenerService() {
         Store.logRaw("${PayParser.apps[pkg]} | $title | $text\n   → $result$lagTxt")
         if (p == null) return
 
-        val key = "${p.source}|${p.amount}|${p.merchant}"
-        if (Store.isDuplicate(key)) return
+        // MAE dan Google Wallet hantar notifikasi untuk paywave yang sama — satu pop up sahaja.
+        val key = "amt|${String.format(java.util.Locale.US, "%.2f", p.amount)}|${p.isIncome}"
+        if (Store.isDuplicate(key)) {
+            Store.logRaw("   (sama dengan notifikasi sebelum ini — tidak diulang)")
+            return
+        }
 
         scope.launch { Popup.fromParsed(applicationContext, p) }
     }
@@ -319,6 +331,7 @@ class PayNotificationListener : NotificationListenerService() {
         Store.init(applicationContext)
         Store.prefs().edit().putLong("listenerConnected", System.currentTimeMillis()).apply()
         Store.logRaw("ℹ pengesan bersambung")
+        KeepAliveService.start(applicationContext)
     }
 
     /** Samsung/Honor kadang putuskan sambungan untuk jimat bateri — minta sambung semula. */

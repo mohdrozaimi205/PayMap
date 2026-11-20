@@ -109,6 +109,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        KeepAliveService.start(this)
+        KeepAliveService.rebindListener(this)
         resumeTick.intValue++
     }
 
@@ -678,6 +680,16 @@ class MainActivity : ComponentActivity() {
                                 startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
                             }.onFailure { openAppSettings() }
                         }
+                        PermRow("7. Pemantau latar", "Notifikasi senyap \"PayMap sedang memantau\" mesti kekal", KeepAliveService.running) {
+                            KeepAliveService.start(this@MainActivity)
+                            resumeTick.intValue++
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Samsung: Tetapan → Bateri → Had penggunaan latar → \"Aplikasi tidak pernah tidur\" → tambah PayMap. " +
+                                "Honor: Tetapan → Bateri → Pelancaran aplikasi → PayMap → Urus secara manual (hidupkan semua).",
+                            fontSize = 12.sp, color = C.Coral
+                        )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Jika nombor 1 tak boleh dihidupkan (\"Tetapan terhad\"): tekan butang di bawah → ⋮ (atas kanan) → \"Benarkan tetapan terhad\", kemudian cuba semula.",
