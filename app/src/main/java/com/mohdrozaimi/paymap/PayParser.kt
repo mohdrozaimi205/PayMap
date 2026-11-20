@@ -18,8 +18,13 @@ object PayParser {
     val apps = mapOf(
         "com.maybank2u.life" to "MAE",
         "com.maybank2u.m2umobile" to "Maybank2u",
-        "my.com.tngdigital.ewallet" to "TnG eWallet"
+        "my.com.tngdigital.ewallet" to "TnG eWallet",
+        "com.google.android.apps.walletnfcrel" to "Google Wallet",
+        "com.samsung.android.spay" to "Samsung Wallet",
+        "com.samsung.android.samsungpay.gear" to "Samsung Wallet"
     )
+
+    private val wallets = setOf("Google Wallet", "Samsung Wallet")
 
     private val amountRe = Regex(
         """(?:RM|MYR)\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)""",
@@ -80,6 +85,21 @@ object PayParser {
         if (amount <= 0.0) return null
 
         if (failWords.any { low.contains(it) }) return null
+
+        // Google / Samsung Wallet: notifikasi tap biasanya "Nama Kedai" + "RM12.50 dengan Visa ••1234".
+        if (source in wallets) {
+            val skip = listOf("added", "ditambah", "ready", "sedia", "verify", "sahkan", "expire", "tamat", "promo", "offer")
+            if (skip.any { low.contains(it) } && sureWords.none { low.contains(it) }) return null
+            val refund = listOf("refund", "pulangan", "credited", "dikreditkan").any { low.contains(it) }
+            val name = title.trim().takeIf {
+                it.isNotBlank() && !it.contains("wallet", ignoreCase = true) && !it.contains("pay", ignoreCase = true) &&
+                    amountRe.find(it) == null
+            }?.let { pretty(it.take(40)) }
+                ?: extractMerchant(text, refund)
+                ?: "Bayaran $source"
+            return Parsed(amount, refund, name, source)
+        }
+
         if (txnWords.none { low.contains(it) }) return null
         val sure = sureWords.any { low.contains(it) }
         if (!sure && promoWords.any { low.contains(it) }) return null

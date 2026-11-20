@@ -217,7 +217,7 @@ class MainActivity : ComponentActivity() {
                 item {
                     WarnCard(
                         "Hidupkan pengesan bayaran",
-                        "Benarkan PayMap baca notifikasi MAE & TnG supaya pop up keluar selepas bayar."
+                        "Benarkan PayMap baca notifikasi MAE, TnG & Google Wallet supaya pop up keluar selepas bayar."
                     ) { tab.intValue = 3 }
                 }
             }
@@ -232,7 +232,7 @@ class MainActivity : ComponentActivity() {
                         Column {
                             Text("Belum ada transaksi", fontWeight = FontWeight.SemiBold)
                             Text(
-                                "Buat bayaran guna MAE atau TnG — PayMap akan tanya untuk simpan. Atau tekan + untuk tambah sendiri.",
+                                "Bayar guna MAE, TnG atau tap Google Wallet — PayMap akan tanya untuk simpan. Atau tekan + untuk tambah sendiri.",
                                 fontSize = 13.sp, color = C.Sub
                             )
                         }
@@ -632,7 +632,7 @@ class MainActivity : ComponentActivity() {
                         Text("Kebenaran", fontWeight = FontWeight.Bold)
                         Text("Hidupkan semua supaya pop up keluar automatik selepas bayar.", fontSize = 12.sp, color = C.Sub)
                         Spacer(Modifier.height(6.dp))
-                        PermRow("1. Baca notifikasi MAE & TnG", "Wajib — untuk kesan bayaran", Notif.listenerEnabled(ctx)) {
+                        PermRow("1. Baca notifikasi bayaran", "Wajib — MAE, TnG, Google Wallet & Samsung Wallet", Notif.listenerEnabled(ctx)) {
                             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         }
                         PermRow("2. Lokasi", "Untuk tanda tempat bayaran", LocationHelper.hasPermission(ctx)) { requestLocation() }
@@ -700,7 +700,7 @@ class MainActivity : ComponentActivity() {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("Log notifikasi", fontWeight = FontWeight.Bold)
-                                Text("Notifikasi MAE/TnG yang dibaca. Screenshot ini jika ada yang tak dikesan.", fontSize = 12.sp, color = C.Sub)
+                                Text("Notifikasi bayaran yang dibaca. Screenshot ini jika ada yang tak dikesan.", fontSize = 12.sp, color = C.Sub)
                             }
                             TextButton(onClick = { showLog = !showLog }) { Text(if (showLog) "Tutup" else "Buka", color = C.Emerald) }
                         }
@@ -717,7 +717,7 @@ class MainActivity : ComponentActivity() {
 
             item {
                 Text(
-                    "PayMap 1.0 · semua data disimpan dalam telefon ini sahaja. Peta © OpenStreetMap.",
+                    "PayMap 1.1 · semua data disimpan dalam telefon ini sahaja. Peta © OpenStreetMap.",
                     fontSize = 11.sp, color = C.Sub, modifier = Modifier.fillMaxWidth(),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )

@@ -1,6 +1,6 @@
 # PayMap
 
-App Android untuk rekod bayaran **MAE** dan **TnG eWallet** berserta **lokasi di peta**.
+App Android untuk rekod bayaran **MAE**, **TnG eWallet**, **Google Wallet** (paywave guna telefon) dan **Samsung Wallet** berserta **lokasi di peta**.
 
 ## Ciri
 - Selepas bayar (scan QR / DuitNow / tap), pop up keluar dengan jumlah, nama kedai dan lokasi. Semak, edit, tekan **Simpan**.
@@ -14,7 +14,8 @@ App Android untuk rekod bayaran **MAE** dan **TnG eWallet** berserta **lokasi di
 ## Pasang
 1. Muat turun `PayMap.apk` dari tab **Releases**.
 2. Pasang, buka, benarkan lokasi & pemberitahuan.
-3. Tetapan → hidupkan **Baca notifikasi MAE & TnG**.
+3. Tetapan → hidupkan **Baca notifikasi bayaran**.
+   Dalam Google Wallet, pastikan notifikasi transaksi dihidupkan.
    Jika keluar "Tetapan terhad": Info App PayMap → ⋮ → **Benarkan tetapan terhad**, kemudian cuba semula.
 4. Tetapan → **Hantar bayaran uji** untuk cuba pop up.
 
