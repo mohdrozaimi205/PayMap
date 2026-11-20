@@ -173,6 +173,10 @@ object Store {
         prefs().edit().remove("rawlog").apply()
     }
 
+    private val savedDrafts = mutableSetOf<Int>()
+    @Synchronized fun markSaved(id: Int) { if (id > 0) savedDrafts.add(id) }
+    @Synchronized fun isSaved(id: Int) = id in savedDrafts
+
     /** Elak pop up berganda bila app bank hantar notifikasi yang sama dua kali. */
     @Synchronized
     fun isDuplicate(key: String): Boolean {

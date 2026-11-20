@@ -244,6 +244,7 @@ class ConfirmActivity : ComponentActivity() {
             receipt = receipt.value
         )
         Store.upsert(t)
+        Store.markSaved(notifId)
         BudgetAlert.check(this, t)
         Notif.cancel(this, notifId)
         Toast.makeText(this, "Disimpan ✓", Toast.LENGTH_SHORT).show()

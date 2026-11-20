@@ -94,7 +94,8 @@ object PayParser {
             if (skip.any { low.contains(it) } && sureWords.none { low.contains(it) }) return null
             val refund = listOf("refund", "pulangan", "credited", "dikreditkan").any { low.contains(it) }
             val name = title.trim().takeIf {
-                it.isNotBlank() && !it.contains("wallet", ignoreCase = true) && !it.contains("pay", ignoreCase = true) &&
+                it.isNotBlank() && !it.contains("wallet", ignoreCase = true) &&
+                    !it.contains("google pay", ignoreCase = true) && !it.contains("samsung pay", ignoreCase = true) &&
                     amountRe.find(it) == null
             }?.let { pretty(it.take(40)) }
                 ?: extractMerchant(text, refund)

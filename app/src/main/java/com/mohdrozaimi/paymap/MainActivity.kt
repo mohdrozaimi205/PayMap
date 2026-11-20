@@ -71,6 +71,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -98,6 +99,7 @@ class MainActivity : ComponentActivity() {
             askPerms.launch(perms.toTypedArray())
         }
         setContent { PayMapTheme { Root() } }
+        lifecycleScope.launch { Updater.check(this@MainActivity) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -213,6 +215,7 @@ class MainActivity : ComponentActivity() {
                     ModeSwitch(mode) { Store.setMode(it) }
                 }
             }
+            item { UpdateBanner() }
             if (!listenerOn) {
                 item {
                     WarnCard(
@@ -243,6 +246,29 @@ class MainActivity : ComponentActivity() {
                     TxnRow(t) { startActivity(ConfirmActivity.edit(this@MainActivity, t.id)) }
                 }
             }
+        }
+    }
+
+    @Composable
+    private fun UpdateBanner() {
+        val info by Updater.available.collectAsState()
+        val u = info ?: return
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(C.Mint)
+                .clickable { Updater.download(this@MainActivity, u) }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(C.Emerald))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Versi baru ${u.name} tersedia", fontWeight = FontWeight.Bold, color = C.Ink)
+                Text("Tekan untuk muat turun. Lepas siap, buka fail APK untuk pasang — data tak hilang.", fontSize = 12.sp, color = C.Sub)
+            }
+            Text("⬇", fontSize = 22.sp, color = C.Emerald)
         }
     }
 
@@ -646,6 +672,12 @@ class MainActivity : ComponentActivity() {
                         PermRow("5. Papar atas app lain", "Wajib untuk pop up keluar sendiri selepas bayar", Settings.canDrawOverlays(ctx)) {
                             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                         }
+                        val pm = getSystemService(android.os.PowerManager::class.java)
+                        PermRow("6. Abaikan penjimat bateri", "Supaya Samsung/Honor tak matikan pengesan", pm?.isIgnoringBatteryOptimizations(packageName) == true) {
+                            runCatching {
+                                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+                            }.onFailure { openAppSettings() }
+                        }
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Jika nombor 1 tak boleh dihidupkan (\"Tetapan terhad\"): tekan butang di bawah → ⋮ (atas kanan) → \"Benarkan tetapan terhad\", kemudian cuba semula.",
@@ -655,6 +687,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+
+            item { VersionCard() }
 
             item {
                 CardBox {
@@ -713,6 +747,15 @@ class MainActivity : ComponentActivity() {
                                 Text(line, fontSize = 11.sp, color = C.Ink, modifier = Modifier.padding(vertical = 4.dp))
                             }
                             if (log.isNotEmpty()) TextButton(onClick = { Store.clearLog() }) { Text("Kosongkan log", color = C.Coral) }
+                            val crash = Store.prefs().getString("lastCrash", null)
+                            if (crash != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Text("Ralat terakhir app:", fontWeight = FontWeight.SemiBold, color = C.Coral, fontSize = 13.sp)
+                                Text(crash.take(800), fontSize = 10.sp, color = C.Ink)
+                                TextButton(onClick = { Store.prefs().edit().remove("lastCrash").apply(); resumeTick.intValue++ }) {
+                                    Text("Padam rekod ralat", color = C.Coral)
+                                }
+                            }
                         }
                     }
                 }
@@ -720,10 +763,46 @@ class MainActivity : ComponentActivity() {
 
             item {
                 Text(
-                    "PayMap 1.2 · semua data disimpan dalam telefon ini sahaja. Peta © OpenStreetMap.",
+                    "Semua data disimpan dalam telefon ini sahaja. Peta © OpenStreetMap.",
                     fontSize = 11.sp, color = C.Sub, modifier = Modifier.fillMaxWidth(),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
+            }
+        }
+    }
+
+    @Composable
+    private fun VersionCard() {
+        val info by Updater.available.collectAsState()
+        val status by Updater.lastCheck.collectAsState()
+        val scope = rememberCoroutineScope()
+        var checking by remember { mutableStateOf(false) }
+        CardBox {
+            Column {
+                Text("Versi app", fontWeight = FontWeight.Bold)
+                Text("PayMap ${Updater.installedName(this@MainActivity)}", fontSize = 13.sp, color = C.Sub)
+                if (status.isNotBlank()) Text(status, fontSize = 12.sp, color = if (info != null) C.Emerald else C.Sub)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val u = info
+                    if (u != null) {
+                        Button(
+                            onClick = { Updater.download(this@MainActivity, u) },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = C.Emerald)
+                        ) { Text("Muat turun ${u.name}") }
+                    } else {
+                        Button(
+                            onClick = {
+                                checking = true
+                                scope.launch { Updater.check(this@MainActivity); checking = false }
+                            },
+                            enabled = !checking,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = C.Ink)
+                        ) { Text(if (checking) "Menyemak…" else "Semak kemas kini") }
+                    }
+                }
             }
         }
     }

@@ -43,6 +43,17 @@ class PayMapApp : Application() {
         Store.init(this)
         Notif.channels(this)
         MonthlyWorker.schedule(this)
+        // Simpan ralat terakhir supaya boleh dilihat di Tetapan (bantu debug).
+        val prev = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                val trace = android.util.Log.getStackTraceString(e).take(3000)
+                Store.prefs().edit()
+                    .putString("lastCrash", "${java.util.Date()}\n$trace")
+                    .commit()
+            }
+            prev?.uncaughtException(t, e)
+        }
     }
 }
 
@@ -107,6 +118,7 @@ object LocationHelper {
 object Notif {
     const val CH_PAY = "pay"
     const val CH_INFO = "info"
+    const val CH_QUIET = "pay_quiet"
 
     fun channels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -116,7 +128,12 @@ object Notif {
             }
         )
         nm.createNotificationChannel(
-            NotificationChannel(CH_INFO, "Penyata & bajet", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CH_INFO, "Penyata, bajet & kemas kini", NotificationManager.IMPORTANCE_DEFAULT)
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_QUIET, "Bayaran dikesan (senyap)", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Digunakan bila pop up terapung sudah dipaparkan"
+            }
         )
     }
 
@@ -152,7 +169,7 @@ object Popup {
     fun newId(): Int = 1000 + (System.currentTimeMillis() % 900000).toInt()
 
     /** Notifikasi PayMap (sandaran jika kad terapung ditutup). */
-    fun notify(ctx: Context, d: Draft, id: Int) {
+    fun notify(ctx: Context, d: Draft, id: Int, quiet: Boolean = false) {
         val i = ConfirmActivity.intent(ctx, d, id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val pi = PendingIntent.getActivity(
             ctx, id, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -160,7 +177,7 @@ object Popup {
         val where = if (d.place.isNotBlank()) " di ${d.place}" else ""
         val kind = if (d.isIncome) "Duit masuk" else "Bayaran"
         Notif.post(
-            ctx, id, Notif.CH_PAY,
+            ctx, id, if (quiet) Notif.CH_QUIET else Notif.CH_PAY,
             "${rm(d.amount ?: 0.0)} · ${d.merchant}",
             "$kind dikesan dari ${d.source}$where. Tekan untuk semak & simpan.",
             pi
@@ -185,8 +202,19 @@ object Popup {
             receipt = null
         )
         Store.upsert(t)
+        Store.markSaved(id)
         BudgetAlert.check(ctx, t)
         Notif.cancel(ctx, id)
+        // Jika disimpan sebelum GPS siap, isi lokasi kemudian.
+        if (t.lat == null) {
+            val app = ctx.applicationContext
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                val loc = LocationHelper.current(app) ?: return@launch
+                val place = LocationHelper.placeName(app, loc.latitude, loc.longitude)
+                val cur = Store.get(t.id) ?: return@launch
+                if (cur.lat == null) Store.upsert(cur.copy(lat = loc.latitude, lng = loc.longitude, place = place))
+            }
+        }
     }
 
     /** Papar kad terapung serta-merta, kemudian isi lokasi bila GPS siap. */
@@ -202,15 +230,17 @@ object Popup {
             place = "",
             time = System.currentTimeMillis()
         )
+        var shown = false
         withContext(Dispatchers.Main) {
-            notify(ctx, d, id)
-            Overlay.show(ctx, d, id)
+            shown = Overlay.show(ctx, d, id)
+            notify(ctx, d, id, quiet = shown)
         }
         val loc = LocationHelper.current(ctx) ?: return
         val place = LocationHelper.placeName(ctx, loc.latitude, loc.longitude)
         d = d.copy(lat = loc.latitude, lng = loc.longitude, place = place)
         withContext(Dispatchers.Main) {
-            notify(ctx, d, id)
+            if (Store.isSaved(id)) return@withContext
+            notify(ctx, d, id, quiet = true)
             Overlay.update(d)
         }
     }
@@ -262,6 +292,20 @@ class PayNotificationListener : NotificationListenerService() {
         Store.logRaw("(app belum dipantau: $pkg) | $title | $text")
     }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Store.init(applicationContext)
+        Store.prefs().edit().putLong("listenerConnected", System.currentTimeMillis()).apply()
+    }
+
+    /** Samsung/Honor kadang putuskan sambungan untuk jimat bateri — minta sambung semula. */
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        runCatching {
+            requestRebind(android.content.ComponentName(this, PayNotificationListener::class.java))
+        }
+    }
+
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
@@ -274,6 +318,7 @@ class MonthlyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
     override suspend fun doWork(): Result {
         val ctx = applicationContext
         Store.init(ctx)
+        Updater.check(ctx)?.let { Updater.notifyOnce(ctx, it) }
         val today = LocalDate.now()
         if (today.dayOfMonth == 1) {
             val last = YearMonth.from(today).minusMonths(1)

@@ -11,8 +11,10 @@ android {
         applicationId = "com.mohdrozaimi.paymap"
         minSdk = 29
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        // Nombor versi ikut nombor binaan GitHub Actions (sama dengan tag release v1.0.N)
+        val run = (System.getenv("GITHUB_RUN_NUMBER") ?: "3").toInt()
+        versionCode = run
+        versionName = "1.0.$run"
     }
 
     signingConfigs {

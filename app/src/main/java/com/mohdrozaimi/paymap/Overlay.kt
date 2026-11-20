@@ -39,9 +39,10 @@ object Overlay {
 
     fun canShow(ctx: Context) = Settings.canDrawOverlays(ctx)
 
-    fun show(ctx: Context, d: Draft, id: Int) {
+    /** Pulang true jika kad terapung berjaya dipaparkan. */
+    fun show(ctx: Context, d: Draft, id: Int): Boolean {
         val app = ctx.applicationContext
-        if (!canShow(app)) return
+        if (!canShow(app)) return false
         hide(app)
         draft = d
         notifId = id
@@ -90,7 +91,10 @@ object Overlay {
         card.addView(top)
 
         card.addView(text(rm(d.amount ?: 0.0), 30f, INK, true).apply { setPadding(0, px(6), 0, 0) })
-        card.addView(text(d.merchant, 16f, INK, true))
+        card.addView(text(d.merchant, 16f, INK, true).apply {
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
         val pv = text(placeLabel(d), 13f, SUB).apply { setPadding(0, px(2), 0, px(12)) }
         placeView = pv
         card.addView(pv)
@@ -124,9 +128,11 @@ object Overlay {
             root = frame
             main.removeCallbacks(autoHide)
             main.postDelayed(autoHide, 120_000)
+            return true
         } catch (e: Exception) {
             root = null
             Store.logRaw("Pop up terapung gagal: ${e.message}")
+            return false
         }
     }
 
