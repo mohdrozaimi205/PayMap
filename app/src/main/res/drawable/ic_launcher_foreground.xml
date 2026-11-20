@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- folded map -->
+    <path android:fillColor="#F4EFE6"
+        android:pathData="M30,40 L44,35 L64,41 L78,36 L78,70 L64,75 L44,69 L30,74 Z" />
+    <path android:fillColor="#E2D8C6"
+        android:pathData="M44,35 L64,41 L64,75 L44,69 Z" />
+    <!-- coral pin -->
+    <path android:fillColor="#E5643F"
+        android:pathData="M54,26 C46.3,26 40,32.3 40,40 C40,50.5 54,62 54,62 C54,62 68,50.5 68,40 C68,32.3 61.7,26 54,26 Z" />
+    <path android:fillColor="#FFFCF6"
+        android:pathData="M54,33.5 A6.5,6.5 0 1,1 53.99,33.5 Z" />
+</vector>

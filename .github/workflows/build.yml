@@ -1,0 +1,39 @@
+name: Bina APK PayMap
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Bina APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk PayMap.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PayMap-APK
+          path: PayMap.apk
+
+      - name: Terbit ke Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: PayMap v1.0.${{ github.run_number }}
+          body: APK PayMap automatik. Muat turun PayMap.apk di bawah dan pasang di telefon.
+          files: PayMap.apk
