@@ -119,6 +119,7 @@ object Notif {
     const val CH_PAY = "pay"
     const val CH_INFO = "info"
     const val CH_QUIET = "pay_quiet"
+    const val CH_ALERT = "pay_alert"
 
     fun channels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -129,6 +130,20 @@ object Notif {
         )
         nm.createNotificationChannel(
             NotificationChannel(CH_INFO, "Penyata, bajet & kemas kini", NotificationManager.IMPORTANCE_DEFAULT)
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_ALERT, "Bayaran dikesan (berbunyi)", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Berbunyi & bergetar bila transaksi MAE / TnG dikesan"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 120, 250)
+                setSound(
+                    android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION),
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
         )
         nm.createNotificationChannel(
             NotificationChannel(CH_QUIET, "Bayaran dikesan (senyap)", NotificationManager.IMPORTANCE_LOW).apply {
@@ -143,8 +158,13 @@ object Notif {
 
     @SuppressLint("MissingPermission")
     fun post(ctx: Context, id: Int, channel: String, title: String, text: String, pi: PendingIntent) {
-        if (!canPost(ctx)) return
+        if (!canPost(ctx)) {
+            Store.logRaw("   ⚠ notifikasi PayMap disekat (izin Pemberitahuan tutup)")
+            return
+        }
         val n = Notification.Builder(ctx, channel)
+            .setOnlyAlertOnce(true)
+            .setCategory(Notification.CATEGORY_EVENT)
             .setSmallIcon(R.drawable.ic_stat)
             .setColor(0xFF0E5A48.toInt())
             .setContentTitle(title)
@@ -177,7 +197,7 @@ object Popup {
         val where = if (d.place.isNotBlank()) " di ${d.place}" else ""
         val kind = if (d.isIncome) "Duit masuk" else "Bayaran"
         Notif.post(
-            ctx, id, if (quiet) Notif.CH_QUIET else Notif.CH_PAY,
+            ctx, id, if (quiet) Notif.CH_QUIET else Notif.CH_ALERT,
             "${rm(d.amount ?: 0.0)} · ${d.merchant}",
             "$kind dikesan dari ${d.source}$where. Tekan untuk semak & simpan.",
             pi
@@ -230,17 +250,17 @@ object Popup {
             place = "",
             time = System.currentTimeMillis()
         )
-        var shown = false
         withContext(Dispatchers.Main) {
-            shown = Overlay.show(ctx, d, id)
-            notify(ctx, d, id, quiet = shown)
+            val why = Overlay.show(ctx, d, id)
+            Store.logRaw("   pop up: $why")
+            notify(ctx, d, id)
         }
         val loc = LocationHelper.current(ctx) ?: return
         val place = LocationHelper.placeName(ctx, loc.latitude, loc.longitude)
         d = d.copy(lat = loc.latitude, lng = loc.longitude, place = place)
         withContext(Dispatchers.Main) {
             if (Store.isSaved(id)) return@withContext
-            notify(ctx, d, id, quiet = true)
+            notify(ctx, d, id)
             Overlay.update(d)
         }
     }
@@ -269,7 +289,9 @@ class PayNotificationListener : NotificationListenerService() {
         Store.init(applicationContext)
         val p = PayParser.parse(pkg, title, text)
         val result = if (p == null) "✗ bukan bayaran" else "✓ dikesan ${rm(p.amount)} · ${p.merchant}"
-        Store.logRaw("${PayParser.apps[pkg]} | $title | $text\n   → $result")
+        val lag = (System.currentTimeMillis() - sbn.postTime) / 1000
+        val lagTxt = if (lag > 5) " (LEWAT ${lag}s — app mungkin dibekukan)" else " (${lag}s)"
+        Store.logRaw("${PayParser.apps[pkg]} | $title | $text\n   → $result$lagTxt")
         if (p == null) return
 
         val key = "${p.source}|${p.amount}|${p.merchant}"
@@ -296,11 +318,13 @@ class PayNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
         Store.init(applicationContext)
         Store.prefs().edit().putLong("listenerConnected", System.currentTimeMillis()).apply()
+        Store.logRaw("ℹ pengesan bersambung")
     }
 
     /** Samsung/Honor kadang putuskan sambungan untuk jimat bateri — minta sambung semula. */
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        runCatching { Store.init(applicationContext); Store.logRaw("⚠ pengesan terputus — cuba sambung semula") }
         runCatching {
             requestRebind(android.content.ComponentName(this, PayNotificationListener::class.java))
         }

@@ -39,10 +39,10 @@ object Overlay {
 
     fun canShow(ctx: Context) = Settings.canDrawOverlays(ctx)
 
-    /** Pulang true jika kad terapung berjaya dipaparkan. */
-    fun show(ctx: Context, d: Draft, id: Int): Boolean {
+    /** Pulang keterangan hasil (untuk log debug). */
+    fun show(ctx: Context, d: Draft, id: Int): String {
         val app = ctx.applicationContext
-        if (!canShow(app)) return false
+        if (!canShow(app)) return "✗ GAGAL — izin 'Papar atas app lain' tutup"
         hide(app)
         draft = d
         notifId = id
@@ -118,8 +118,9 @@ object Overlay {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP
-            y = px(36)
+            // Di bawah skrin supaya tidak ditutup oleh notifikasi MAE / TnG yang turun dari atas
+            gravity = Gravity.BOTTOM
+            y = px(72)
             windowAnimations = android.R.style.Animation_Toast
         }
 
@@ -128,11 +129,10 @@ object Overlay {
             root = frame
             main.removeCallbacks(autoHide)
             main.postDelayed(autoHide, 120_000)
-            return true
+            return "✓ dipaparkan"
         } catch (e: Exception) {
             root = null
-            Store.logRaw("Pop up terapung gagal: ${e.message}")
-            return false
+            return "✗ GAGAL — ${e.javaClass.simpleName}: ${e.message}"
         }
     }
 
