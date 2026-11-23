@@ -60,6 +60,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -142,29 +144,7 @@ class MainActivity : ComponentActivity() {
         Scaffold(
             containerColor = C.Bg,
             bottomBar = {
-                NavigationBar(containerColor = C.Card, tonalElevation = 0.dp) {
-                    val items = listOf(
-                        Triple("Utama", Icons.Filled.Home, 0),
-                        Triple("Peta", Icons.Filled.LocationOn, 1),
-                        Triple("Penyata", Icons.Filled.DateRange, 2),
-                        Triple("Tetapan", Icons.Filled.Settings, 3)
-                    )
-                    items.forEach { (label, icon, idx) ->
-                        NavigationBarItem(
-                            selected = current == idx,
-                            onClick = { tab.intValue = idx },
-                            icon = { Icon(icon, contentDescription = label) },
-                            label = { Text(label) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = C.Emerald,
-                                selectedTextColor = C.Emerald,
-                                indicatorColor = Color.Transparent,
-                                unselectedIconColor = C.Sub,
-                                unselectedTextColor = C.Sub
-                            )
-                        )
-                    }
-                }
+                FloatingTabBar(current) { idx -> tab.intValue = idx }
             },
             floatingActionButton = {
                 if (current == 0) {
@@ -183,6 +163,80 @@ class MainActivity : ComponentActivity() {
                     1 -> MapScreen()
                     2 -> StatementScreen()
                     else -> SettingsScreen()
+                }
+            }
+        }
+    }
+
+    /**
+     * Bar navigasi terapung dengan penunjuk biru yang meluncur.
+     * Hanya penunjuk dianimasikan; halaman ditukar serta-merta oleh Root().
+     */
+    @Composable
+    private fun FloatingTabBar(current: Int, onSelect: (Int) -> Unit) {
+        val items = listOf(
+            Triple("Utama", Icons.Filled.Home, 0),
+            Triple("Peta", Icons.Filled.LocationOn, 1),
+            Triple("Penyata", Icons.Filled.DateRange, 2),
+            Triple("Tetapan", Icons.Filled.Settings, 3)
+        )
+        val shape = RoundedCornerShape(30.dp)
+        androidx.compose.foundation.layout.BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp)
+                .shadow(18.dp, shape, ambientColor = Color(0x33000000), spotColor = Color(0x33000000))
+                .clip(shape)
+                .background(C.Card)
+                .padding(6.dp)
+        ) {
+            val tabW = maxWidth / items.size
+            // Kedudukan penunjuk: spring lembut, ikut lebar sebenar setiap tab (semua saiz skrin)
+            val indicatorX by androidx.compose.animation.core.animateDpAsState(
+                targetValue = tabW * current,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = 0.82f,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                ),
+                label = "tabIndicator"
+            )
+            // Penunjuk biru (capsule)
+            Box(
+                Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(indicatorX.roundToPx(), 0) }
+                    .width(tabW)
+                    .height(58.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(C.Blue)
+            )
+            Row(Modifier.fillMaxWidth().height(58.dp)) {
+                items.forEach { (label, icon, idx) ->
+                    // Warna ikut kedudukan penunjuk: jadi putih bila penunjuk sampai ke tab ini
+                    val dist = kotlin.math.abs((indicatorX - tabW * idx).value) / tabW.value
+                    val t = (1f - dist).coerceIn(0f, 1f)
+                    val col = androidx.compose.ui.graphics.lerp(C.Sub, Color.White, t)
+                    val noRipple = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(24.dp))
+                            .clickable(interactionSource = noRipple, indication = null) {
+                                if (idx != current) onSelect(idx)
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(icon, contentDescription = label, tint = col, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            label,
+                            color = col,
+                            fontSize = 11.sp,
+                            fontWeight = if (current == idx) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
