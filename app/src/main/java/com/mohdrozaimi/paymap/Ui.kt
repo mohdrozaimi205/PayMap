@@ -43,25 +43,84 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import java.io.File
 
-/** Palet "Peta Kertas": krim hangat, hijau zamrud, pin karang. */
+/** Palet gaya iOS 18: latar kelabu "grouped", kad putih, warna sistem Apple. */
 object C {
-    val Bg = Color(0xFFF4EFE6)
-    val Card = Color(0xFFFFFCF6)
-    val Ink = Color(0xFF1C2622)
-    val Sub = Color(0xFF6B746F)
-    val Line = Color(0xFFE6DFD2)
-    val Emerald = Color(0xFF0E5A48)
-    val EmeraldLight = Color(0xFF1F8A6E)
-    val Mint = Color(0xFFDCEDE4)
-    val Coral = Color(0xFFE5643F)
-    val CoralSoft = Color(0xFFFBE3DA)
-    val Gold = Color(0xFFD9A441)
+    val Bg = Color(0xFFF2F2F7)        // systemGroupedBackground
+    val Card = Color(0xFFFFFFFF)
+    val Ink = Color(0xFF000000)
+    val Sub = Color(0xFF8E8E93)       // secondaryLabel
+    val Line = Color(0xFFE5E5EA)      // separator
+    val Fill = Color(0x1F767680)      // segmented control track
+    val Blue = Color(0xFF007AFF)
+    val Cyan = Color(0xFF5AC8FA)
+    val Green = Color(0xFF34C759)
+    val Red = Color(0xFFFF3B30)
+    val Orange = Color(0xFFFF9500)
+    val Yellow = Color(0xFFFFCC00)
+    val Purple = Color(0xFFAF52DE)
+    val Indigo = Color(0xFF5856D6)
+    val Teal = Color(0xFF30B0C7)
+    val Pink = Color(0xFFFF2D55)
+    val Gray = Color(0xFF8E8E93)
+
+    // Nama lama (dipetakan ke warna iOS)
+    val Emerald = Blue
+    val EmeraldLight = Green
+    val Mint = Color(0xFFE3F0FF)
+    val Coral = Red
+    val CoralSoft = Color(0xFFFFEBEA)
+    val Gold = Orange
 }
 
 private val catPalette = listOf(
-    Color(0xFFE5643F), Color(0xFF0E5A48), Color(0xFFD9A441), Color(0xFF3F6FB5),
-    Color(0xFF8E5BB5), Color(0xFF2E9C8F), Color(0xFFB5475B), Color(0xFF7A7F6E)
+    C.Orange, C.Green, C.Blue, C.Yellow, C.Pink, C.Red, C.Purple, C.Gray,
+    C.Indigo, C.Teal, C.Cyan
 )
+
+/** Ikon emoji untuk setiap kategori (dalam petak bulat gaya iOS). */
+fun catIcon(cat: String): String = when (cat) {
+    "Makan & Minum" -> "🍔"
+    "Barang Runcit" -> "🛒"
+    "Minyak & Transport" -> "⛽"
+    "Bil & Utiliti" -> "💡"
+    "Belanja" -> "🛍️"
+    "Kesihatan" -> "💊"
+    "Hiburan" -> "🎬"
+    "Gaji" -> "💼"
+    "Pindahan Masuk" -> "💸"
+    "Jualan" -> "🏷️"
+    else -> "📦"
+}
+
+/** Petak ikon bulat (squircle) berwarna gaya iOS. */
+@Composable
+fun IosIcon(cat: String, size: Int = 40) {
+    Box(
+        Modifier
+            .size(size.dp)
+            .clip(RoundedCornerShape((size * 0.27f).dp))
+            .background(catColor(cat)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(catIcon(cat), fontSize = (size * 0.48f).sp)
+    }
+}
+
+/** Bentuk untuk senarai "inset grouped": hanya baris pertama & terakhir bucu bulat. */
+fun groupShape(index: Int, count: Int, r: Int = 14): RoundedCornerShape {
+    val top = if (index == 0) r.dp else 0.dp
+    val bottom = if (index == count - 1) r.dp else 0.dp
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
+}
+
+/** Tajuk seksyen kecil huruf besar, gaya iOS. */
+@Composable
+fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text.uppercase(), modifier = modifier.padding(start = 16.dp, top = 6.dp),
+        fontSize = 12.sp, color = C.Sub, letterSpacing = 0.4.sp
+    )
+}
 
 fun catColor(cat: String): Color {
     val all = Cats.expense + Cats.income
@@ -73,9 +132,9 @@ fun catColor(cat: String): Color {
 fun PayMapTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
-            primary = C.Emerald,
+            primary = C.Blue,
             onPrimary = Color.White,
-            secondary = C.Coral,
+            secondary = C.Orange,
             background = C.Bg,
             surface = C.Card,
             onSurface = C.Ink,
@@ -90,14 +149,14 @@ fun PayMapTheme(content: @Composable () -> Unit) {
 fun Pill(text: String, selected: Boolean, color: Color = C.Ink, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (selected) color else Color.Transparent)
+            .clip(RoundedCornerShape(9.dp))
+            .background(if (selected) Color.White else Color.Transparent)
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
         Text(
             text,
-            color = if (selected) Color.White else C.Sub,
+            color = if (selected) (if (color == C.Ink) C.Ink else color) else C.Ink.copy(alpha = 0.6f),
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             fontSize = 13.sp
         )
@@ -108,9 +167,9 @@ fun Pill(text: String, selected: Boolean, color: Color = C.Ink, onClick: () -> U
 fun ModeSwitch(mode: String, onChange: (String) -> Unit) {
     Row(
         Modifier
-            .clip(RoundedCornerShape(50))
-            .background(C.Line)
-            .padding(3.dp)
+            .clip(RoundedCornerShape(11.dp))
+            .background(C.Fill)
+            .padding(2.dp)
     ) {
         Pill("Personal", mode == "Personal") { onChange("Personal") }
         Pill("Business", mode == "Business") { onChange("Business") }
@@ -121,13 +180,12 @@ fun ModeSwitch(mode: String, onChange: (String) -> Unit) {
 fun ChipSelect(text: String, selected: Boolean, color: Color, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) color.copy(alpha = 0.16f) else C.Card)
-            .border(1.dp, if (selected) color else C.Line, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) color else C.Card)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 9.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
     ) {
-        Text(text, color = if (selected) color else C.Ink, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(text, color = if (selected) Color.White else C.Ink, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 
@@ -136,10 +194,9 @@ fun CardBox(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(C.Card)
-            .border(1.dp, C.Line, RoundedCornerShape(24.dp))
-            .padding(18.dp)
+            .padding(16.dp)
     ) { content() }
 }
 
@@ -148,14 +205,14 @@ fun Bar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
     Box(
         modifier
             .fillMaxWidth()
-            .height(8.dp)
+            .height(6.dp)
             .clip(RoundedCornerShape(50))
-            .background(C.Line)
+            .background(C.Fill)
     ) {
         Box(
             Modifier
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .height(8.dp)
+                .height(6.dp)
                 .clip(RoundedCornerShape(50))
                 .background(color)
         )
@@ -163,49 +220,57 @@ fun Bar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun TxnRow(t: Txn, onClick: () -> Unit) {
-    Row(
+fun TxnRow(
+    t: Txn,
+    index: Int = 0,
+    count: Int = 1,
+    onClick: () -> Unit
+) {
+    Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(groupShape(index, count))
+            .background(C.Card)
             .clickable { onClick() }
-            .padding(vertical = 10.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        val col = catColor(t.category)
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(col.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                t.merchant.trim().firstOrNull()?.uppercase() ?: "?",
-                color = col, fontWeight = FontWeight.Bold, fontSize = 18.sp
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(t.merchant, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = C.Ink)
-            val bits = listOfNotNull(
-                t.category,
-                fmtShort(t.time),
-                if (t.place.isNotBlank()) "📍 " + t.place else null
-            )
-            Text(bits.joinToString(" · "), fontSize = 12.sp, color = C.Sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                (if (t.isIncome) "+" else "−") + rm(t.amount),
-                fontWeight = FontWeight.Bold,
-                color = if (t.isIncome) C.EmeraldLight else C.Ink
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (t.receipt != null) Text("🧾", fontSize = 11.sp)
-                Text(t.source, fontSize = 11.sp, color = C.Sub)
+            IosIcon(t.category, 38)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(t.merchant, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = C.Ink)
+                val bits = listOfNotNull(
+                    fmtShort(t.time),
+                    if (t.place.isNotBlank()) t.place else null
+                )
+                Text(bits.joinToString(" · "), fontSize = 13.sp, color = C.Sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    (if (t.isIncome) "+" else "−") + rm(t.amount),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (t.isIncome) C.Green else C.Ink
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (t.receipt != null) Text("🧾", fontSize = 11.sp)
+                    Text(t.source, fontSize = 12.sp, color = C.Sub)
+                }
+            }
+            Spacer(Modifier.width(6.dp))
+            Text("›", fontSize = 20.sp, color = Color(0xFFC4C4C7))
+        }
+        if (index < count - 1) {
+            Box(
+                Modifier
+                    .padding(start = 64.dp)
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(C.Line)
+            )
         }
     }
 }
@@ -227,7 +292,7 @@ private fun pinDrawable(mv: MapView, label: String): BitmapDrawable {
     val tail = (7 * d).toInt()
     val bmp = Bitmap.createBitmap(w, h + tail, Bitmap.Config.ARGB_8888)
     val c = Canvas(bmp)
-    val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE5643F.toInt() }
+    val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF007AFF.toInt() }
     val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2 * d
     }

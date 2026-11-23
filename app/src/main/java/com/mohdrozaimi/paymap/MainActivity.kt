@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = C.Emerald,
                                 selectedTextColor = C.Emerald,
-                                indicatorColor = C.Mint,
+                                indicatorColor = Color.Transparent,
                                 unselectedIconColor = C.Sub,
                                 unselectedTextColor = C.Sub
                             )
@@ -170,9 +170,9 @@ class MainActivity : ComponentActivity() {
                 if (current == 0) {
                     FloatingActionButton(
                         onClick = { startActivity(ConfirmActivity.manual(this)) },
-                        containerColor = C.Coral,
+                        containerColor = C.Blue,
                         contentColor = Color.White,
-                        shape = RoundedCornerShape(20.dp)
+                        shape = CircleShape
                     ) { Icon(Icons.Filled.Add, contentDescription = "Tambah") }
                 }
             }
@@ -211,7 +211,7 @@ class MainActivity : ComponentActivity() {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("PayMap", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = C.Emerald)
+                        Text("PayMap", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = C.Ink)
                         Text(greeting(), fontSize = 13.sp, color = C.Sub)
                     }
                     ModeSwitch(mode) { Store.setMode(it) }
@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
             item { HeroCard(ym, spent, income, month.size) }
             item { BudgetCard(mode, month, budgets) }
             item {
-                Text("Terkini", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = C.Ink, modifier = Modifier.padding(top = 4.dp))
+                SectionHeader("Terkini")
             }
             if (mine.isEmpty()) {
                 item {
@@ -244,8 +244,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } else {
-                items(mine.take(40), key = { it.id }) { t ->
-                    TxnRow(t) { startActivity(ConfirmActivity.edit(this@MainActivity, t.id)) }
+                item {
+                    val list = mine.take(40)
+                    Column {
+                        list.forEachIndexed { i, t ->
+                            TxnRow(t, i, list.size) { startActivity(ConfirmActivity.edit(this@MainActivity, t.id)) }
+                        }
+                    }
                 }
             }
         }
@@ -254,13 +259,15 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun UpdateBanner() {
         val info by Updater.available.collectAsState()
+        val prog by Updater.progress.collectAsState()
+        val scope = rememberCoroutineScope()
         val u = info ?: return
         Row(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(22.dp))
                 .background(C.Mint)
-                .clickable { Updater.download(this@MainActivity, u) }
+                .clickable { scope.launch { Updater.downloadAndInstall(this@MainActivity, u) } }
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -268,9 +275,12 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Versi baru ${u.name} tersedia", fontWeight = FontWeight.Bold, color = C.Ink)
-                Text("Tekan untuk muat turun. Lepas siap, buka fail APK untuk pasang — data tak hilang.", fontSize = 12.sp, color = C.Sub)
+                Text(
+                    if (prog != null) "Memuat turun… $prog%" else "Tekan untuk kemas kini sekarang — data tak hilang.",
+                    fontSize = 12.sp, color = C.Sub
+                )
             }
-            Text("⬇", fontSize = 22.sp, color = C.Emerald)
+            Text(if (prog != null) "⏳" else "⬇", fontSize = 22.sp, color = C.Blue)
         }
     }
 
@@ -310,8 +320,8 @@ class MainActivity : ComponentActivity() {
         Box(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(30.dp))
-                .background(Brush.linearGradient(listOf(C.Emerald, C.EmeraldLight)))
+                .clip(RoundedCornerShape(22.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF0A84FF), Color(0xFF5E5CE6))))
                 .padding(22.dp)
         ) {
             // corak garis kontur peta
@@ -489,7 +499,7 @@ class MainActivity : ComponentActivity() {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Penyata", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = C.Ink)
+                        Text("Penyata", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = C.Ink)
                         Text("Akaun $mode", fontSize = 13.sp, color = C.Sub)
                     }
                     ModeSwitch(mode) { Store.setMode(it) }
@@ -582,9 +592,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            item { Text("Transaksi (${s.list.size})", fontWeight = FontWeight.Bold, fontSize = 17.sp) }
-            items(s.list.reversed(), key = { it.id }) { t ->
-                TxnRow(t) { startActivity(ConfirmActivity.edit(this@MainActivity, t.id)) }
+            item { SectionHeader("Transaksi (${s.list.size})") }
+            item {
+                val list = s.list.reversed()
+                Column {
+                    list.forEachIndexed { i, t ->
+                        TxnRow(t, i, list.size) { startActivity(ConfirmActivity.edit(this@MainActivity, t.id)) }
+                    }
+                }
             }
         }
     }
@@ -592,7 +607,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun StatBox(title: String, value: String, color: Color, modifier: Modifier) {
         Column(
-            modifier.clip(RoundedCornerShape(22.dp)).background(C.Card).padding(16.dp)
+            modifier.clip(RoundedCornerShape(16.dp)).background(C.Card).padding(16.dp)
         ) {
             Text(title, fontSize = 12.sp, color = C.Sub)
             Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color)
@@ -652,7 +667,7 @@ class MainActivity : ComponentActivity() {
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item { Text("Tetapan", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = C.Ink) }
+            item { Text("Tetapan", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = C.Ink) }
 
             item {
                 CardBox {
@@ -787,6 +802,7 @@ class MainActivity : ComponentActivity() {
     private fun VersionCard() {
         val info by Updater.available.collectAsState()
         val status by Updater.lastCheck.collectAsState()
+        val prog by Updater.progress.collectAsState()
         val scope = rememberCoroutineScope()
         var checking by remember { mutableStateOf(false) }
         CardBox {
@@ -799,10 +815,11 @@ class MainActivity : ComponentActivity() {
                     val u = info
                     if (u != null) {
                         Button(
-                            onClick = { Updater.download(this@MainActivity, u) },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = C.Emerald)
-                        ) { Text("Muat turun ${u.name}") }
+                            onClick = { scope.launch { Updater.downloadAndInstall(this@MainActivity, u) } },
+                            enabled = prog == null,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
+                        ) { Text(if (prog != null) "Memuat turun… $prog%" else "Kemas kini sekarang (${u.name})") }
                     } else {
                         Button(
                             onClick = {
@@ -838,13 +855,13 @@ class MainActivity : ComponentActivity() {
                 Text(desc, fontSize = 12.sp, color = C.Sub)
             }
             Box(
-                Modifier.clip(RoundedCornerShape(50)).background(if (ok) C.Mint else C.CoralSoft)
+                Modifier.clip(RoundedCornerShape(50)).background(if (ok) Color(0xFFE3F8E8) else C.CoralSoft)
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
                     if (ok) "✓ Aktif" else "Hidupkan",
                     fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                    color = if (ok) C.Emerald else C.Coral
+                    color = if (ok) Color(0xFF248A3D) else C.Coral
                 )
             }
         }

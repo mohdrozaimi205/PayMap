@@ -45,11 +45,11 @@ object Statement {
         var page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, pageNo).create())
         var c = page.canvas
 
-        val green = 0xFF0E5A48.toInt()
-        val coral = 0xFFE5643F.toInt()
-        val ink = 0xFF1C2622.toInt()
-        val sub = 0xFF6B746F.toInt()
-        val line = 0xFFE6DFD2.toInt()
+        val green = 0xFF007AFF.toInt()
+        val coral = 0xFFFF3B30.toInt()
+        val ink = 0xFF000000.toInt()
+        val sub = 0xFF8E8E93.toInt()
+        val line = 0xFFE5E5EA.toInt()
 
         val title = Paint().apply { color = ink; textSize = 22f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
         val bold = Paint().apply { color = ink; textSize = 11f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
@@ -75,7 +75,7 @@ object Statement {
         )
         boxes.forEachIndexed { i, b ->
             val x = 40f + i * 175f
-            fill.color = 0xFFF4EFE6.toInt()
+            fill.color = 0xFFF2F2F7.toInt()
             c.drawRoundRect(RectF(x, y, x + 160f, y + 56f), 10f, 10f, fill)
             c.drawText(b.first, x + 12f, y + 20f, small)
             c.drawText(b.second, x + 12f, y + 42f, Paint(bold).apply { color = b.third; textSize = 15f })

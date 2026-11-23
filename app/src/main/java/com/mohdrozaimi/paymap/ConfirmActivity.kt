@@ -277,7 +277,7 @@ class ConfirmActivity : ComponentActivity() {
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = 780.dp)
-                    .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
                     .background(C.Bg)
                     .clickable(interactionSource = noRipple2, indication = null) { }
                     .verticalScroll(rememberScrollState())
@@ -285,7 +285,7 @@ class ConfirmActivity : ComponentActivity() {
             ) {
                 // Pemegang
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(44.dp).height(5.dp).clip(RoundedCornerShape(50)).background(C.Line))
+                    Box(Modifier.width(36.dp).height(5.dp).clip(RoundedCornerShape(50)).background(Color(0xFFC7C7CC)))
                 }
                 Spacer(Modifier.height(12.dp))
 
@@ -305,7 +305,7 @@ class ConfirmActivity : ComponentActivity() {
 
                 // Belanja / Masuk
                 Row(
-                    Modifier.clip(RoundedCornerShape(50)).background(C.Line).padding(3.dp)
+                    Modifier.clip(RoundedCornerShape(11.dp)).background(C.Fill).padding(2.dp)
                 ) {
                     Pill("Belanja", !isIncome.value, C.Coral) {
                         isIncome.value = false
@@ -382,8 +382,8 @@ class ConfirmActivity : ComponentActivity() {
                     Button(
                         onClick = { save() },
                         modifier = Modifier.weight(1f).height(54.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = C.Emerald)
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
                     ) { Text("Simpan", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
                 }
                 Spacer(Modifier.height(20.dp))

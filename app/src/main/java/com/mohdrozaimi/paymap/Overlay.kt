@@ -28,14 +28,16 @@ object Overlay {
     private var draft: Draft? = null
     private var notifId = 0
     private var placeView: TextView? = null
+    private var headView: TextView? = null
+    private var merchantView: TextView? = null
     private val autoHide = Runnable { root?.context?.let { hide(it) } }
 
-    private const val INK = 0xFF1C2622.toInt()
-    private const val SUB = 0xFF6B746F.toInt()
-    private const val CARD = 0xFFFFFCF6.toInt()
-    private const val LINE = 0xFFE6DFD2.toInt()
-    private const val GREEN = 0xFF0E5A48.toInt()
-    private const val CORAL = 0xFFE5643F.toInt()
+    private const val INK = 0xFF000000.toInt()
+    private const val SUB = 0xFF8E8E93.toInt()
+    private const val CARD = 0xFFFFFFFF.toInt()
+    private const val LINE = 0xFFE5E5EA.toInt()
+    private const val GREEN = 0xFF007AFF.toInt()   // butang utama: biru iOS
+    private const val CORAL = 0xFFFF3B30.toInt()
 
     fun canShow(ctx: Context) = Settings.canDrawOverlays(ctx)
 
@@ -80,10 +82,9 @@ object Overlay {
         // Baris atas: label + tutup
         val top = LinearLayout(app).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val kind = if (d.isIncome) "Duit masuk" else "Bayaran"
-        top.addView(
-            text("● $kind dikesan · ${d.source}", 12f, CORAL, true),
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        )
+        val hv = text(headLabel(d), 13f, sourceColor(d.source), true)
+        headView = hv
+        top.addView(hv, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         top.addView(text("✕", 18f, SUB).apply {
             setPadding(px(10), px(2), px(2), px(2))
             setOnClickListener { hide(app) }
@@ -91,10 +92,12 @@ object Overlay {
         card.addView(top)
 
         card.addView(text(rm(d.amount ?: 0.0), 30f, INK, true).apply { setPadding(0, px(6), 0, 0) })
-        card.addView(text(d.merchant, 16f, INK, true).apply {
+        val mv = text(d.merchant, 16f, INK, true).apply {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-        })
+        }
+        merchantView = mv
+        card.addView(mv)
         val pv = text(placeLabel(d), 13f, SUB).apply { setPadding(0, px(2), 0, px(12)) }
         placeView = pv
         card.addView(pv)
@@ -141,6 +144,27 @@ object Overlay {
         if (root == null) return
         draft = d
         placeView?.text = placeLabel(d)
+        headView?.text = headLabel(d)
+        headView?.setTextColor(sourceColor(d.source))
+        merchantView?.text = d.merchant
+    }
+
+    private fun headLabel(d: Draft): String {
+        val kind = if (d.isIncome) "Duit masuk" else "Bayaran"
+        val how = when (d.source) {
+            "Google Wallet", "Samsung Wallet" -> "paywave · ${d.source}"
+            else -> d.source
+        }
+        return "● $kind dikesan · $how"
+    }
+
+    /** Warna label ikut sumber: Google Wallet biru, MAE kuning, TnG biru gelap. */
+    private fun sourceColor(src: String): Int = when (src) {
+        "Google Wallet" -> 0xFF1A73E8.toInt()
+        "Samsung Wallet" -> 0xFF1428A0.toInt()
+        "MAE", "Maybank2u" -> 0xFFE0A800.toInt()
+        "TnG eWallet" -> 0xFF005ABB.toInt()
+        else -> CORAL
     }
 
     fun hide(ctx: Context) {
@@ -148,6 +172,8 @@ object Overlay {
         val v = root ?: return
         root = null
         placeView = null
+        headView = null
+        merchantView = null
         runCatching { ctx.applicationContext.getSystemService(WindowManager::class.java).removeView(v) }
     }
 

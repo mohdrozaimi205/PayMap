@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.service.notification.NotificationListenerService
+import kotlinx.coroutines.launch
 
 /**
  * Pemantau latar: perkhidmatan "foreground" dengan notifikasi senyap supaya
@@ -24,6 +25,10 @@ class KeepAliveService : Service() {
     private val tick = object : Runnable {
         override fun run() {
             rebindListener(this@KeepAliveService)
+            val app = applicationContext
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                runCatching { Updater.checkIfDue(app) }
+            }
             main.postDelayed(this, 15 * 60_000L)
         }
     }
@@ -38,7 +43,7 @@ class KeepAliveService : Service() {
         )
         val n = Notification.Builder(this, Notif.CH_WATCH)
             .setSmallIcon(R.drawable.ic_stat)
-            .setColor(0xFF0E5A48.toInt())
+            .setColor(0xFF007AFF.toInt())
             .setContentTitle("PayMap sedang memantau bayaran")
             .setContentText("MAE · TnG · Google Wallet — pop up keluar selepas bayar")
             .setOngoing(true)

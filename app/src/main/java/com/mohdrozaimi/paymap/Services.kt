@@ -174,7 +174,7 @@ object Notif {
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_EVENT)
             .setSmallIcon(R.drawable.ic_stat)
-            .setColor(0xFF0E5A48.toInt())
+            .setColor(0xFF007AFF.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
@@ -194,6 +194,36 @@ object Notif {
 
 /** Keluarkan pop up semak & simpan. */
 object Popup {
+    /** Pop up yang sedang dipaparkan (id notifikasi, draf). */
+    @Volatile private var active: Pair<Int, Draft>? = null
+
+    private val wallets = setOf("Google Wallet", "Samsung Wallet")
+
+    /**
+     * Paywave guna telefon: MAE dan Google Wallet sama-sama hantar notifikasi.
+     * Jika notifikasi Google Wallet datang untuk jumlah yang sama, tukar sumber pop up ke Google Wallet.
+     */
+    fun preferWallet(ctx: Context, p: Parsed): Boolean {
+        if (p.source !in wallets) return false
+        val (id, d) = active ?: return false
+        if (kotlin.math.abs((d.amount ?: 0.0) - p.amount) > 0.001) return false
+        if (d.source == p.source) return true
+        val nd = d.copy(
+            source = p.source,
+            merchant = if (p.merchant.startsWith("Bayaran ")) d.merchant else p.merchant
+        )
+        active = id to nd
+        Overlay.update(nd)
+        if (Store.isSaved(id)) {
+            Store.txns.value.firstOrNull { it.time == d.time }?.let {
+                Store.upsert(it.copy(source = nd.source, merchant = nd.merchant))
+            }
+        } else {
+            notify(ctx, nd, id)
+        }
+        return true
+    }
+
     fun newId(): Int = 1000 + (System.currentTimeMillis() % 900000).toInt()
 
     /** Notifikasi PayMap (sandaran jika kad terapung ditutup). */
@@ -258,6 +288,7 @@ object Popup {
             place = "",
             time = System.currentTimeMillis()
         )
+        active = id to d
         withContext(Dispatchers.Main) {
             val why = Overlay.show(ctx, d, id)
             Store.logRaw("   pop up: $why")
@@ -265,7 +296,10 @@ object Popup {
         }
         val loc = LocationHelper.current(ctx) ?: return
         val place = LocationHelper.placeName(ctx, loc.latitude, loc.longitude)
-        d = d.copy(lat = loc.latitude, lng = loc.longitude, place = place)
+        // Ambil draf terkini (mungkin sumber dah ditukar ke Google Wallet)
+        val base = active?.takeIf { it.first == id }?.second ?: d
+        d = base.copy(lat = loc.latitude, lng = loc.longitude, place = place)
+        if (active?.first == id) active = id to d
         withContext(Dispatchers.Main) {
             if (Store.isSaved(id)) return@withContext
             notify(ctx, d, id)
@@ -305,7 +339,11 @@ class PayNotificationListener : NotificationListenerService() {
         // MAE dan Google Wallet hantar notifikasi untuk paywave yang sama — satu pop up sahaja.
         val key = "amt|${String.format(java.util.Locale.US, "%.2f", p.amount)}|${p.isIncome}"
         if (Store.isDuplicate(key)) {
-            Store.logRaw("   (sama dengan notifikasi sebelum ini — tidak diulang)")
+            val app = applicationContext
+            scope.launch(Dispatchers.Main) {
+                if (Popup.preferWallet(app, p)) Store.logRaw("   ↳ pop up ditukar ke sumber ${p.source}")
+                else Store.logRaw("   (sama dengan notifikasi sebelum ini — tidak diulang)")
+            }
             return
         }
 

@@ -24,6 +24,17 @@ object Updater {
 
     val available = MutableStateFlow<UpdateInfo?>(null)
     val lastCheck = MutableStateFlow("")
+    /** Peratus muat turun (null = tidak sedang muat turun). */
+    val progress = MutableStateFlow<Int?>(null)
+
+    /** Semak paling kerap sekali setiap 3 jam (dipanggil oleh pemantau latar). */
+    suspend fun checkIfDue(ctx: Context) {
+        val p = Store.prefs()
+        val now = System.currentTimeMillis()
+        if (now - p.getLong("lastUpdateCheck", 0) < 3 * 3600_000L) return
+        p.edit().putLong("lastUpdateCheck", now).apply()
+        check(ctx)?.let { notifyOnce(ctx, it) }
+    }
 
     fun installedCode(ctx: Context): Int = try {
         val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
@@ -82,10 +93,84 @@ object Updater {
         }
     }
 
-    /** Muat turun APK melalui pelayar; selepas siap, tekan fail untuk pasang. */
-    fun download(ctx: Context, info: UpdateInfo) {
+    /** Pelayar sebagai sandaran jika muat turun dalam app gagal. */
+    fun openInBrowser(ctx: Context, info: UpdateInfo) {
         val i = Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { ctx.startActivity(i) }
+    }
+
+    /**
+     * Muat turun APK terus dalam PayMap, kemudian buka skrin "Pasang".
+     * Kali pertama, Android minta izin "Pasang app tidak diketahui" untuk PayMap.
+     */
+    suspend fun downloadAndInstall(ctx: Context, info: UpdateInfo) {
+        if (progress.value != null) return
+        if (!ctx.packageManager.canRequestPackageInstalls()) {
+            val i = Intent(
+                android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${ctx.packageName}")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(
+                    ctx, "Benarkan PayMap pasang kemas kini, kemudian tekan Muat turun semula",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                runCatching { ctx.startActivity(i) }
+            }
+            return
+        }
+        progress.value = 0
+        val file = java.io.File(ctx.cacheDir, "kemaskini/PayMap-${info.name}.apk")
+        val ok = withContext(Dispatchers.IO) {
+            try {
+                file.parentFile?.mkdirs()
+                var url = URL(info.apkUrl)
+                var c = url.openConnection() as HttpURLConnection
+                c.instanceFollowRedirects = true
+                c.setRequestProperty("User-Agent", "PayMap-Android")
+                // GitHub alih ke pelayan lain; ikut sehingga 5 kali
+                var hops = 0
+                while (c.responseCode in 300..399 && hops < 5) {
+                    url = URL(c.getHeaderField("Location"))
+                    c.disconnect()
+                    c = url.openConnection() as HttpURLConnection
+                    c.setRequestProperty("User-Agent", "PayMap-Android")
+                    hops++
+                }
+                if (c.responseCode != 200) return@withContext false
+                val total = c.contentLengthLong
+                c.inputStream.use { input ->
+                    file.outputStream().use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        var done = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                            done += n
+                            if (total > 0) progress.value = ((done * 100) / total).toInt()
+                        }
+                    }
+                }
+                c.disconnect()
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+        progress.value = null
+        withContext(Dispatchers.Main) {
+            if (!ok) {
+                android.widget.Toast.makeText(ctx, "Muat turun gagal — cuba melalui pelayar", android.widget.Toast.LENGTH_LONG).show()
+                openInBrowser(ctx, info)
+                return@withContext
+            }
+            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+            val i = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { ctx.startActivity(i) }
+        }
     }
 
     /** Notifikasi sekali sahaja bagi setiap versi baru. */
@@ -93,13 +178,13 @@ object Updater {
         val p = Store.prefs()
         if (p.getInt("notifiedUpdate", 0) >= info.code) return
         val i = Intent(ctx, MainActivity::class.java)
-            .putExtra("tab", 3)
+            .putExtra("tab", 0)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pi = PendingIntent.getActivity(ctx, 99, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         Notif.post(
             ctx, 99, Notif.CH_INFO,
             "PayMap ${info.name} tersedia",
-            "Versi baru PayMap dah keluar. Tekan untuk muat turun & pasang.",
+            "Versi baru PayMap dah keluar. Tekan, kemudian tekan Kemas kini sekarang.",
             pi
         )
         p.edit().putInt("notifiedUpdate", info.code).apply()
